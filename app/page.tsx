@@ -19,7 +19,16 @@ export default function Home() {
   return (
     <>
       {screen === "welcome" && (
-        <Welcome onStart={() => setScreen("difficulty")} />
+        <Welcome
+          onStart={(name) => {
+            sessionStorage.setItem(
+              "juruduck_player_name",
+              name
+            );
+
+            setScreen("difficulty");
+          }}
+        />
       )}
 
       {screen === "difficulty" && (
