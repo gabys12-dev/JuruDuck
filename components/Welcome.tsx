@@ -20,7 +20,7 @@ const letters: Letter[] = [
 ];
 
 export default function Welcome({ onStart }: { onStart: () => void }) {
-  const containerRef = useRef<HTMLMainElement>(null);
+  const containerRef = useRef<HTMLElement>(null);
 
   const dragRef = useRef<{
     id: number;
