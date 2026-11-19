@@ -15,7 +15,7 @@ type DifficultyName = "Fácil" | "Médio" | "Difícil";
 
 type RankingRow = {
   player_name: string;
-  difficulty: string;
+  difficulty: DifficultyName;
   score: number;
 };
 

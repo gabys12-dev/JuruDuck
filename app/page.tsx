@@ -8,6 +8,7 @@ import Difficulty from "../components/Difficulty";
 import Game from "../components/Game";
 
 type DifficultyName = "Fácil" | "Médio" | "Difícil";
+
 type Screen = "welcome" | "difficulty" | "game";
 
 export default function Home() {
@@ -16,14 +17,21 @@ export default function Home() {
   const [selectedDifficulty, setSelectedDifficulty] =
     useState<DifficultyName>("Fácil");
 
+  const [playerName, setPlayerName] = useState("");
+
   return (
     <>
+      {/* Tela inicial */}
       {screen === "welcome" && (
         <Welcome
           onStart={(name) => {
+            const cleanName = name.trim();
+
+            setPlayerName(cleanName);
+
             sessionStorage.setItem(
               "juruduck_player_name",
-              name
+              cleanName
             );
 
             setScreen("difficulty");
@@ -31,19 +39,22 @@ export default function Home() {
         />
       )}
 
+      {/* Escolha da dificuldade */}
       {screen === "difficulty" && (
         <Difficulty
           onBack={() => setScreen("welcome")}
           onContinue={(level) => {
-            setSelectedDifficulty(level as DifficultyName);
+            setSelectedDifficulty(level);
             setScreen("game");
           }}
         />
       )}
 
+      {/* Jogo */}
       {screen === "game" && (
         <Game
           difficulty={selectedDifficulty}
+          playerName={playerName}
           onBack={() => setScreen("difficulty")}
         />
       )}

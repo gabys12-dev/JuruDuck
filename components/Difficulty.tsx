@@ -4,13 +4,15 @@
 import { useState } from "react";
 import Duck from "./Duck";
 
+type DifficultyName = "Fácil" | "Médio" | "Difícil";
+
 type DifficultyProps = {
   onBack: () => void;
-  onContinue: (difficulty: string) => void;
+  onContinue: (difficulty: DifficultyName) => void;
 };
 
 type DifficultyLevel = {
-  name: string;
+  name: DifficultyName;
   description: string;
   color: string;
   icon: string;
@@ -46,9 +48,9 @@ export default function Difficulty({
     },
   ];
 
-  const [selected, setSelected] = useState("Fácil");
+  const [selected, setSelected] =
+    useState<DifficultyName>("Fácil");
 
-  // Identifica o estado do Duck conforme a dificuldade
   const selectedDifficulty = difficulties.find(
     (difficulty) => difficulty.name === selected
   );
