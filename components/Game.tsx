@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Duck from "./Duck";
 import { supabase } from "../lib/supabase";
 
@@ -25,72 +25,27 @@ type GameProps = {
 
 const WORDS: Record<DifficultyName, WordChallenge[]> = {
   "Fácil": [
-    {
-      word: "LIXA",
-      hint: "Utilizada para lixar e preparar superfícies.",
-    },
-    {
-      word: "PIA",
-      hint: "Pode ser instalada na cozinha ou no banheiro.",
-    },
-    {
-      word: "PISO",
-      hint: "Revestimento utilizado no chão dos ambientes.",
-    },
-    {
-      word: "TINTA",
-      hint: "Utilizada para dar cor e acabamento às paredes.",
-    },
-    {
-      word: "COLA",
-      hint: "Produto utilizado para unir ou fixar materiais.",
-    },
+    { word: "LIXA", hint: "Utilizada para lixar e preparar superfícies." },
+    { word: "PIA", hint: "Pode ser instalada na cozinha ou no banheiro." },
+    { word: "PISO", hint: "Revestimento utilizado no chão dos ambientes." },
+    { word: "TINTA", hint: "Utilizada para dar cor e acabamento às paredes." },
+    { word: "COLA", hint: "Produto utilizado para unir ou fixar materiais." },
   ],
 
   "Médio": [
-    {
-      word: "CIMENTO",
-      hint: "Material muito utilizado na construção civil.",
-    },
-    {
-      word: "TORNEIRA",
-      hint: "Controla a saída de água da pia.",
-    },
-    {
-      word: "CHUVEIRO",
-      hint: "Equipamento utilizado para tomar banho.",
-    },
-    {
-      word: "REJUNTE",
-      hint: "Utilizado para preencher os espaços entre pisos e revestimentos.",
-    },
-    {
-      word: "TELHA",
-      hint: "Utilizada na cobertura de telhados.",
-    },
+    { word: "CIMENTO", hint: "Material muito utilizado na construção civil." },
+    { word: "TORNEIRA", hint: "Controla a saída de água da pia." },
+    { word: "CHUVEIRO", hint: "Equipamento utilizado para tomar banho." },
+    { word: "REJUNTE", hint: "Utilizado para preencher os espaços entre pisos e revestimentos." },
+    { word: "TELHA", hint: "Utilizada na cobertura de telhados." },
   ],
 
   "Difícil": [
-    {
-      word: "PORCELANATO",
-      hint: "Revestimento utilizado em pisos e paredes, com diferentes acabamentos.",
-    },
-    {
-      word: "ARGAMASSA",
-      hint: "Utilizada para assentar pisos, revestimentos e outros materiais.",
-    },
-    {
-      word: "IMPERMEABILIZANTE",
-      hint: "Produto que ajuda a proteger superfícies contra infiltrações.",
-    },
-    {
-      word: "ELETRODUTO",
-      hint: "Utilizado para proteger e conduzir fios e cabos elétricos.",
-    },
-    {
-      word: "ESMALTE",
-      hint: "Tipo de tinta utilizado em diferentes superfícies, como madeira e metal.",
-    },
+    { word: "PORCELANATO", hint: "Revestimento utilizado em pisos e paredes, com diferentes acabamentos." },
+    { word: "ARGAMASSA", hint: "Utilizada para assentar pisos, revestimentos e outros materiais." },
+    { word: "IMPERMEABILIZANTE", hint: "Produto que ajuda a proteger superfícies contra infiltrações." },
+    { word: "ELETRODUTO", hint: "Utilizado para proteger e conduzir fios e cabos elétricos." },
+    { word: "ESMALTE", hint: "Tipo de tinta utilizado em diferentes superfícies, como madeira e metal." },
   ],
 };
 
@@ -119,19 +74,18 @@ export default function Game({
     Array(WORDS[difficulty][0].word.length).fill(null)
   );
 
+  const [selectedTile, setSelectedTile] = useState<number | null>(null);
+
   const [score, setScore] = useState(0);
   const [feedback, setFeedback] = useState("");
   const [solved, setSolved] = useState(false);
   const [finished, setFinished] = useState(false);
 
-  const [draggingTile, setDraggingTile] = useState<number | null>(null);
-
   const [savingScore, setSavingScore] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
 
-  // Impede o registro duplicado da mesma partida.
-  const scoreSaved = useRef(false);
-  const savingRef = useRef(false);
+  const [scoreSaved, setScoreSaved] = useState(false);
+  const [savingRef, setSavingRef] = useState(false);
 
   const currentChallenge = wordList[roundIndex];
 
@@ -141,32 +95,31 @@ export default function Game({
     setRoundIndex(0);
     setTiles(shuffleLetters(firstWord));
     setSlots(Array(firstWord.length).fill(null));
+    setSelectedTile(null);
     setScore(0);
     setFeedback("");
     setSolved(false);
     setFinished(false);
     setSavingScore(false);
     setSaveMessage("");
-
-    scoreSaved.current = false;
-    savingRef.current = false;
+    setScoreSaved(false);
+    setSavingRef(false);
   }, [difficulty]);
 
-  // Verifica quais letras já foram utilizadas.
   const usedTiles = slots.filter(
     (tileId): tileId is number => tileId !== null
   );
 
   // Salva a pontuação no Supabase.
   async function saveScore() {
-    if (scoreSaved.current || savingRef.current) return;
+    if (scoreSaved || savingRef) return;
 
     if (!playerName.trim()) {
       setSaveMessage("Nome do jogador não encontrado.");
       return;
     }
 
-    savingRef.current = true;
+    setSavingRef(true);
     setSavingScore(true);
     setSaveMessage("");
 
@@ -175,91 +128,70 @@ export default function Game({
         .from("ranking")
         .insert({
           player_name: playerName.trim(),
-          difficulty: difficulty,
-          score: score,
+          difficulty,
+          score,
         });
 
       if (error) {
         console.error("Erro ao salvar pontuação:", error);
-        setSaveMessage(
-          "Não foi possível salvar. Verifique sua conexão e tente novamente."
-        );
+        setSaveMessage("Não foi possível salvar. Tente novamente.");
         return;
       }
 
-      scoreSaved.current = true;
+      setScoreSaved(true);
       setSaveMessage("Pontuação salva no ranking! 🏆");
     } catch (error) {
       console.error("Erro inesperado:", error);
       setSaveMessage("Ocorreu um erro ao salvar sua pontuação.");
     } finally {
-      savingRef.current = false;
+      setSavingRef(false);
       setSavingScore(false);
     }
   }
 
-  // Coloca uma letra no espaço escolhido.
-  function placeTile(tileId: number, slotIndex: number) {
-    if (solved || slots[slotIndex] !== null) return;
-    if (usedTiles.includes(tileId)) return;
-
-    setSlots((previous) => {
-      const updated = [...previous];
-      updated[slotIndex] = tileId;
-      return updated;
-    });
-
-    setFeedback("");
-  }
-
-  // Retira uma letra do espaço.
-  function removeTile(slotIndex: number) {
-    if (solved) return;
-
-    setSlots((previous) => {
-      const updated = [...previous];
-      updated[slotIndex] = null;
-      return updated;
-    });
-
-    setFeedback("");
-  }
-
-  // Permite arrastar uma letra.
-  function handlePointerDown(
-    event: React.PointerEvent<HTMLButtonElement>,
-    tileId: number
-  ) {
+  // Seleciona uma letra.
+  function selectTile(tileId: number) {
     if (solved || usedTiles.includes(tileId)) return;
 
-    event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    setDraggingTile(tileId);
-  }
-
-  function handlePointerUp(
-    event: React.PointerEvent<HTMLButtonElement>,
-    tileId: number
-  ) {
-    const target = document.elementFromPoint(
-      event.clientX,
-      event.clientY
+    setSelectedTile((previous) =>
+      previous === tileId ? null : tileId
     );
 
-    const slot = target?.closest("[data-slot-index]");
-
-    if (slot) {
-      const slotIndex = Number(
-        slot.getAttribute("data-slot-index")
-      );
-
-      placeTile(tileId, slotIndex);
-    }
-
-    setDraggingTile(null);
+    setFeedback("");
   }
 
-  // Confere se a palavra está correta.
+  // Coloca a letra selecionada no espaço escolhido.
+  function placeTile(slotIndex: number) {
+    if (solved) return;
+
+    // Se o espaço já tiver uma letra, devolve-a às opções.
+    if (slots[slotIndex] !== null) {
+      setSlots((previous) => {
+        const updated = [...previous];
+        updated[slotIndex] = null;
+        return updated;
+      });
+
+      setFeedback("");
+      return;
+    }
+
+    if (selectedTile === null) {
+      setFeedback("Primeiro selecione uma letra!");
+      return;
+    }
+
+    setSlots((previous) => {
+      const updated = [...previous];
+      updated[slotIndex] = selectedTile;
+      return updated;
+    });
+
+    setSelectedTile(null);
+    setFeedback("");
+  }
+
+  // Confere a palavra.
   function checkWord() {
     if (solved) return;
 
@@ -269,9 +201,8 @@ export default function Game({
     }
 
     const formedWord = slots
-      .map(
-        (tileId) =>
-          tiles.find((tile) => tile.id === tileId)?.letter ?? ""
+      .map((tileId) =>
+        tiles.find((tile) => tile.id === tileId)?.letter ?? ""
       )
       .join("");
 
@@ -282,10 +213,9 @@ export default function Game({
       setScore((previous) => previous + 10);
       setFeedback("Muito bem! Você acertou! 🎉");
       setSolved(true);
+      setSelectedTile(null);
     } else {
-      setFeedback(
-        "Ops! A palavra não está correta. Tente novamente!"
-      );
+      setFeedback("Ops! A palavra não está correta. Tente novamente!");
     }
   }
 
@@ -304,6 +234,7 @@ export default function Game({
     setRoundIndex(nextIndex);
     setTiles(shuffleLetters(nextChallenge.word));
     setSlots(Array(nextChallenge.word.length).fill(null));
+    setSelectedTile(null);
     setFeedback("");
     setSolved(false);
   }
@@ -312,10 +243,7 @@ export default function Game({
   if (finished) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center bg-[#0F172A] p-6 text-white">
-        <Duck
-          state="celebrating"
-          className="w-48 h-48"
-        />
+        <Duck state="celebrating" className="w-48 h-48" />
 
         <h1 className="mt-4 text-4xl font-bold text-[#FF3B20] text-center">
           Parabéns!
@@ -337,16 +265,14 @@ export default function Game({
           {saveMessage}
         </p>
 
-        {!scoreSaved.current && (
+        {!scoreSaved && (
           <button
             type="button"
             onClick={saveScore}
             disabled={savingScore}
             className="mt-4 rounded-xl bg-purple-400 px-6 py-3 font-bold text-black transition hover:scale-105 disabled:opacity-50"
           >
-            {savingScore
-              ? "Salvando..."
-              : "Tentar salvar pontuação"}
+            {savingScore ? "Salvando..." : "Tentar salvar pontuação"}
           </button>
         )}
 
@@ -420,7 +346,7 @@ export default function Game({
         </div>
       </div>
 
-      {/* Espaços para montar a palavra */}
+      {/* Espaços da palavra */}
       <div className="mt-8 flex max-w-full flex-wrap justify-center gap-2">
         {slots.map((tileId, index) => {
           const letter = tiles.find(
@@ -431,16 +357,16 @@ export default function Game({
             <button
               key={index}
               type="button"
-              data-slot-index={index}
-              onClick={() => removeTile(index)}
+              onClick={() => placeTile(index)}
+              disabled={solved}
               className={`flex h-12 w-12 items-center justify-center rounded-xl border-2 text-2xl font-bold transition sm:h-14 sm:w-14 ${
                 letter
-                  ? "border-[#FF3B20] bg-[#FF3B20] text-black"
+                  ? "border-[#FF3B20] bg-[#FF3B20] text-black hover:bg-orange-400"
+                  : selectedTile !== null
+                  ? "border-purple-400 bg-[#172033] text-purple-300 hover:bg-purple-900/40"
                   : "border-dashed border-gray-500 bg-[#172033] text-gray-500"
               }`}
-              aria-label={`Espaço ${index + 1}${
-                letter ? `, letra ${letter}` : ", vazio"
-              }`}
+              aria-label={`Espaço ${index + 1}${letter ? `, letra ${letter}` : ", vazio"}`}
             >
               {letter ?? ""}
             </button>
@@ -448,29 +374,32 @@ export default function Game({
         })}
       </div>
 
-      {/* Letras embaralhadas */}
-      <div className="mt-8 flex max-w-xl flex-wrap justify-center gap-3">
+      {/* Orientação */}
+      <p className="mt-5 text-sm text-gray-400 text-center">
+        {selectedTile !== null
+          ? "Agora escolha um espaço para colocar a letra."
+          : "Selecione uma letra abaixo para começar."}
+      </p>
+
+      {/* Letras selecionáveis */}
+      <div className="mt-5 flex max-w-xl flex-wrap justify-center gap-3">
         {tiles.map((tile) => {
           const isUsed = usedTiles.includes(tile.id);
+          const isSelected = selectedTile === tile.id;
 
           return (
             <button
               key={tile.id}
               type="button"
               disabled={isUsed || solved}
-              onPointerDown={(event) =>
-                handlePointerDown(event, tile.id)
-              }
-              onPointerUp={(event) =>
-                handlePointerUp(event, tile.id)
-              }
-              onPointerCancel={() => setDraggingTile(null)}
-              className={`flex h-14 w-14 items-center justify-center rounded-xl text-2xl font-bold transition select-none touch-none ${
+              onClick={() => selectTile(tile.id)}
+              aria-pressed={isSelected}
+              className={`flex h-14 w-14 items-center justify-center rounded-xl text-2xl font-bold transition select-none ${
                 isUsed
                   ? "cursor-default bg-gray-700 text-gray-500 opacity-30"
-                  : draggingTile === tile.id
-                  ? "scale-110 bg-purple-400 text-black"
-                  : "cursor-grab bg-[#FF3B20] text-black shadow-lg hover:scale-110 active:cursor-grabbing"
+                  : isSelected
+                  ? "-translate-y-2 scale-110 bg-purple-400 text-black ring-4 ring-purple-300/40"
+                  : "cursor-pointer bg-[#FF3B20] text-black shadow-lg hover:scale-110 hover:bg-orange-400"
               }`}
             >
               {tile.letter}
@@ -479,7 +408,7 @@ export default function Game({
         })}
       </div>
 
-      {/* Mensagem de feedback */}
+      {/* Feedback */}
       <p
         className={`mt-6 min-h-7 text-center font-semibold ${
           solved ? "text-green-400" : "text-yellow-300"
