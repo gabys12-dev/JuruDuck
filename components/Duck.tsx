@@ -19,31 +19,48 @@ type DuckProps = {
   className?: string;
 };
 
-// Configurações das animações
-const IDLE_FRAMES = 17;
-const LOOK_RIGHT_FRAMES = 6;
+// Quantidade de frames de cada animação
+const ANIMATION_FRAMES = {
+  idle: 17,
+  look_right: 6,
+  celebrating: 6,
+  sad: 17,
+};
+
 const FRAME_INTERVAL = 93;
 
 // Caminho base do projeto
 const BASE_PATH =
   process.env.NODE_ENV === "production" ? "/JuruDuck" : "";
 
-// Função para montar os caminhos das imagens
+// Monta os caminhos das imagens
 const getDuckImagePath = (path: string): string => {
   return `${BASE_PATH}${path}`;
 };
 
-// Imagens das expressões do Duck
+// Monta o caminho de cada frame
+const getFramePath = (
+  animation: string,
+  frame: number
+): string => {
+  const frameNumber = String(frame).padStart(2, "0");
+
+  return getDuckImagePath(
+    `/imagens_duck/${animation}/${animation}${frameNumber}.png`
+  );
+};
+
+// Imagens estáticas das expressões
 const duckImages: Record<
-  Exclude<DuckState, "idle" | "look_right">,
+  Exclude<
+    DuckState,
+    "idle" | "look_right" | "celebrating" | "sad"
+  >,
   string
 > = {
   happy: getDuckImagePath("/imagens_duck/happy/happy.png"),
-  sad: getDuckImagePath("/imagens_duck/sad/sad.png"),
   surprise: getDuckImagePath("/imagens_duck/surprise/surprise.png"),
   talking: getDuckImagePath("/imagens_duck/talking/talking.png"),
-  celebrating: getDuckImagePath("/imagens_duck/celebrating/celebrating.png"),
-
   look_left: getDuckImagePath("/imagens_duck/looking/look_left.png"),
   look_center: getDuckImagePath("/imagens_duck/looking/look_center.png"),
 };
@@ -54,46 +71,53 @@ export default function Duck({
 }: DuckProps) {
   const [currentFrame, setCurrentFrame] = useState(1);
 
-  // Pré-carrega as imagens do Duck
+  // Pré-carrega todas as imagens
   useEffect(() => {
-    // Frames da animação idle
-    for (let i = 1; i <= IDLE_FRAMES; i++) {
-      const image = new Image();
+    const animations = [
+      { name: "idle", totalFrames: ANIMATION_FRAMES.idle },
+      {
+        name: "look_right",
+        totalFrames: ANIMATION_FRAMES.look_right,
+      },
+      {
+        name: "celebrating",
+        totalFrames: ANIMATION_FRAMES.celebrating,
+      },
+      {
+        name: "sad",
+        totalFrames: ANIMATION_FRAMES.sad,
+      },
+    ];
 
-      image.src = getDuckImagePath(
-        `/imagens_duck/idle/idle0${i}.png`
-      );
-    }
+    animations.forEach(({ name, totalFrames }) => {
+      for (let i = 1; i <= totalFrames; i++) {
+        const image = new Image();
+        image.src = getFramePath(name, i);
+      }
+    });
 
-    // Frames da animação look_right
-    for (let i = 1; i <= LOOK_RIGHT_FRAMES; i++) {
-      const image = new Image();
-
-      image.src = getDuckImagePath(
-        `/imagens_duck/looking/look_right0${i}.png`
-      );
-    }
-
-    // Pré-carrega as imagens das expressões
+    // Pré-carrega as imagens estáticas
     Object.values(duckImages).forEach((src) => {
       const image = new Image();
       image.src = src;
     });
   }, []);
 
-  // Reinicia o contador quando muda o estado
+  // Reinicia a animação quando o estado muda
   useEffect(() => {
     setCurrentFrame(1);
   }, [state]);
 
-  // Animação automática
+  // Controla as animações
   useEffect(() => {
-    if (state !== "idle" && state !== "look_right") {
+    const isAnimated = state in ANIMATION_FRAMES;
+
+    if (!isAnimated) {
       return;
     }
 
     const totalFrames =
-      state === "idle" ? IDLE_FRAMES : LOOK_RIGHT_FRAMES;
+      ANIMATION_FRAMES[state as keyof typeof ANIMATION_FRAMES];
 
     const interval = window.setInterval(() => {
       setCurrentFrame((previous) => {
@@ -106,17 +130,19 @@ export default function Duck({
     };
   }, [state]);
 
-  // Caminho da imagem atual
-  const imageSrc =
-    state === "idle"
-      ? getDuckImagePath(
-          `/imagens_duck/idle/idle0${currentFrame}.png`
-        )
-      : state === "look_right"
-      ? getDuckImagePath(
-          `/imagens_duck/looking/look_right0${currentFrame}.png`
-        )
-      : duckImages[state];
+  // Define a imagem atual
+  const imageSrc = (() => {
+    switch (state) {
+      case "idle":
+      case "look_right":
+      case "celebrating":
+      case "sad":
+        return getFramePath(state, currentFrame);
+
+      default:
+        return duckImages[state];
+    }
+  })();
 
   return (
     <div className="relative z-50 flex flex-col items-center">
@@ -126,10 +152,7 @@ export default function Duck({
         className={`object-contain ${className}`}
         draggable={false}
         onError={() => {
-          console.error(
-            "Imagem não encontrada:",
-            imageSrc
-          );
+          console.error("Imagem não encontrada:", imageSrc);
         }}
       />
     </div>

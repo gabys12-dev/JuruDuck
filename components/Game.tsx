@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Duck from "./Duck";
 import { supabase } from "../lib/supabase";
 
@@ -22,6 +21,17 @@ type GameProps = {
   playerName: string;
   onBack: () => void;
 };
+
+type DuckReaction = "idle" | "sad" | "celebrating";
+type FeedbackType = "info" | "success" | "error";
+
+// Pontuação
+const POINTS_CORRECT = 10; // pontos ganhos ao acertar
+const POINTS_WRONG = 5; // pontos perdidos ao errar
+const ALLOW_NEGATIVE_SCORE = false; // true = permite pontuação negativa
+
+// Tempo (ms) que o Duck fica triste antes de voltar ao normal
+const SAD_DURATION = 2000;
 
 const WORDS: Record<DifficultyName, WordChallenge[]> = {
   "Fácil": [
@@ -78,8 +88,16 @@ export default function Game({
 
   const [score, setScore] = useState(0);
   const [feedback, setFeedback] = useState("");
+  const [feedbackType, setFeedbackType] = useState<FeedbackType>("info");
   const [solved, setSolved] = useState(false);
   const [finished, setFinished] = useState(false);
+
+  // Animação do Duck
+  const [duckReaction, setDuckReaction] = useState<DuckReaction>("idle");
+  const sadTimeoutRef = useRef<number | null>(null);
+
+  // Guarda a última tentativa errada para não descontar duas vezes a mesma
+  const [lastWrongAttempt, setLastWrongAttempt] = useState<string | null>(null);
 
   const [savingScore, setSavingScore] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
@@ -89,17 +107,44 @@ export default function Game({
 
   const currentChallenge = wordList[roundIndex];
 
+  function clearSadTimeout() {
+    if (sadTimeoutRef.current !== null) {
+      window.clearTimeout(sadTimeoutRef.current);
+      sadTimeoutRef.current = null;
+    }
+  }
+
+  // Deixa o Duck triste por alguns segundos
+  function showSadDuck() {
+    clearSadTimeout();
+    setDuckReaction("sad");
+
+    sadTimeoutRef.current = window.setTimeout(() => {
+      setDuckReaction((previous) => (previous === "sad" ? "idle" : previous));
+      sadTimeoutRef.current = null;
+    }, SAD_DURATION);
+  }
+
+  // Limpa o timer ao sair do jogo
+  useEffect(() => {
+    return () => clearSadTimeout();
+  }, []);
+
   useEffect(() => {
     const firstWord = WORDS[difficulty][0].word;
 
+    clearSadTimeout();
     setRoundIndex(0);
     setTiles(shuffleLetters(firstWord));
     setSlots(Array(firstWord.length).fill(null));
     setSelectedTile(null);
     setScore(0);
     setFeedback("");
+    setFeedbackType("info");
     setSolved(false);
     setFinished(false);
+    setDuckReaction("idle");
+    setLastWrongAttempt(null);
     setSavingScore(false);
     setSaveMessage("");
     setScoreSaved(false);
@@ -177,6 +222,7 @@ export default function Game({
     }
 
     if (selectedTile === null) {
+      setFeedbackType("info");
       setFeedback("Primeiro selecione uma letra!");
       return;
     }
@@ -196,6 +242,7 @@ export default function Game({
     if (solved) return;
 
     if (slots.some((tileId) => tileId === null)) {
+      setFeedbackType("info");
       setFeedback("Ainda faltam letras! Complete todos os espaços.");
       return;
     }
@@ -209,14 +256,35 @@ export default function Game({
     const correctWord =
       currentChallenge.word.toLocaleUpperCase("pt-BR");
 
+    // ACERTOU
     if (formedWord === correctWord) {
-      setScore((previous) => previous + 10);
-      setFeedback("Muito bem! Você acertou! 🎉");
+      clearSadTimeout();
+      setScore((previous) => previous + POINTS_CORRECT);
+      setFeedbackType("success");
+      setFeedback(`Muito bem! Você acertou! +${POINTS_CORRECT} pontos 🎉`);
       setSolved(true);
       setSelectedTile(null);
-    } else {
-      setFeedback("Ops! A palavra não está correta. Tente novamente!");
+      setDuckReaction("celebrating");
+      return;
     }
+
+    // ERROU — mesma combinação errada de antes: não desconta de novo
+    if (formedWord === lastWrongAttempt) {
+      setFeedbackType("error");
+      setFeedback("Você já tentou essa combinação! Mude as letras.");
+      showSadDuck();
+      return;
+    }
+
+    // ERROU — desconta pontos
+    setScore((previous) => {
+      const newScore = previous - POINTS_WRONG;
+      return ALLOW_NEGATIVE_SCORE ? newScore : Math.max(0, newScore);
+    });
+    setLastWrongAttempt(formedWord);
+    setFeedbackType("error");
+    setFeedback(`Ops! A palavra não está correta. -${POINTS_WRONG} pontos 😢`);
+    showSadDuck();
   }
 
   // Avança para o próximo desafio.
@@ -231,12 +299,16 @@ export default function Game({
 
     const nextChallenge = wordList[nextIndex];
 
+    clearSadTimeout();
     setRoundIndex(nextIndex);
     setTiles(shuffleLetters(nextChallenge.word));
     setSlots(Array(nextChallenge.word.length).fill(null));
     setSelectedTile(null);
     setFeedback("");
+    setFeedbackType("info");
     setSolved(false);
+    setDuckReaction("idle");
+    setLastWrongAttempt(null);
   }
 
   // Tela de conclusão.
@@ -304,7 +376,11 @@ export default function Game({
           JuruDuck
         </span>
 
-        <span className="text-sm font-bold">
+        <span
+          className={`text-sm font-bold transition-colors ${
+            duckReaction === "sad" ? "text-red-400" : ""
+          }`}
+        >
           ⭐ {score} pontos
         </span>
       </div>
@@ -331,7 +407,7 @@ export default function Game({
       {/* Duck e dica */}
       <div className="mt-4 flex flex-col items-center">
         <Duck
-          state={solved ? "happy" : "idle"}
+          state={duckReaction}
           className="h-40 w-40"
         />
 
@@ -411,7 +487,11 @@ export default function Game({
       {/* Feedback */}
       <p
         className={`mt-6 min-h-7 text-center font-semibold ${
-          solved ? "text-green-400" : "text-yellow-300"
+          feedbackType === "success"
+            ? "text-green-400"
+            : feedbackType === "error"
+            ? "text-red-400"
+            : "text-yellow-300"
         }`}
         aria-live="polite"
       >
